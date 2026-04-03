@@ -1,4 +1,4 @@
-name: Build AAR Only v1.13.4
+name: Build AAR for v1.13.4
 
 on:
   workflow_dispatch:
@@ -6,53 +6,41 @@ on:
 jobs:
   build-aar:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: v1.13.4
+          ref: v1.13.4                     # 固定使用 v1.13.4 标签
           submodules: 'recursive'
           fetch-depth: 0
 
-      - name: Set up Go
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
-
-      - name: Install gomobile
-        run: |
-          go install github.com/sagernet/gomobile/cmd/gomobile@latest
-          ~/go/bin/gomobile init
+          go-version: ~1.25.8
 
       - name: Setup Android NDK
+        id: setup-ndk
         uses: nttld/setup-ndk@v1
         with:
-          ndk-version: r25c
+          ndk-version: r28
 
       - name: Setup OpenJDK
         run: |
-          sudo apt update
-          sudo apt install -y openjdk-17-jdk-headless
-
-      - name: Download Go modules
-        run: go mod download
+          sudo apt update && sudo apt install -y openjdk-17-jdk-headless
+          /usr/lib/jvm/java-17-openjdk-amd64/bin/java --version
 
       - name: Build AAR
         run: |
+          make lib_install
           export PATH="$PATH:$(go env GOPATH)/bin"
-          ~/go/bin/gomobile bind -target=android/arm64,android/arm,android/386,android/amd64 \
-            -androidapi=21 \
-            -javapkg=io.nekohasekai \
-            -libname=box \
-            -tags=with_gvisor,with_quic,with_wireguard,with_utls,with_acme,with_clash_api \
-            -trimpath \
-            -ldflags="-X github.com/sagernet/sing-box/constant.Commit=unknown -X github.com/sagernet/sing-box/constant.Version=1.13.4 -buildid= -s -w" \
-            -o libbox.aar \
-            ./experimental/libbox
+          make lib_android
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
       - name: Upload AAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: libbox-aar-v1.13.4
-          path: libbox.aar
+          path: "*.aar"                    # 匹配生成的 AAR 文件
