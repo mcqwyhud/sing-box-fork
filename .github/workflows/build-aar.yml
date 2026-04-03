@@ -1,7 +1,7 @@
 name: Build AAR for v1.13.4
 
 on:
-  workflow_dispatch:    # 手动触发
+  workflow_dispatch:
 
 jobs:
   build-aar:
@@ -11,14 +11,14 @@ jobs:
       - name: Checkout code (v1.13.4 tag)
         uses: actions/checkout@v4
         with:
-          ref: v1.13.4                # 固定检出 v1.13.4 标签
-          submodules: 'recursive'     # 拉取子模块（sing-box 依赖）
+          ref: v1.13.4
+          submodules: 'recursive'
           fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'          # 使用兼容的 Go 版本
+          go-version: '1.21'
 
       - name: Install gomobile
         run: |
@@ -41,8 +41,7 @@ jobs:
       - name: Build AAR
         run: |
           export PATH="$PATH:$(go env GOPATH)/bin"
-          export ANDROID_HOME=$HOME/android-sdk
-          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk
+          # 不再手动设置 ANDROID_HOME 和 ANDROID_NDK_HOME
           ~/go/bin/gomobile bind -target=android/arm64,android/arm,android/386,android/amd64 \
             -androidapi=21 \
             -javapkg=io.nekohasekai \
