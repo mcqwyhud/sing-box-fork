@@ -1,0 +1,60 @@
+name: Build AAR for v1.13.4
+
+on:
+  workflow_dispatch:    # 手动触发
+
+jobs:
+  build-aar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code (v1.13.4 tag)
+        uses: actions/checkout@v4
+        with:
+          ref: v1.13.4                # 固定检出 v1.13.4 标签
+          submodules: 'recursive'     # 拉取子模块（sing-box 依赖）
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'          # 使用兼容的 Go 版本
+
+      - name: Install gomobile
+        run: |
+          go install github.com/sagernet/gomobile/cmd/gomobile@latest
+          ~/go/bin/gomobile init
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+
+      - name: Setup OpenJDK
+        run: |
+          sudo apt update
+          sudo apt install -y openjdk-17-jdk-headless
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Build AAR
+        run: |
+          export PATH="$PATH:$(go env GOPATH)/bin"
+          export ANDROID_HOME=$HOME/android-sdk
+          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk
+          ~/go/bin/gomobile bind -target=android/arm64,android/arm,android/386,android/amd64 \
+            -androidapi=21 \
+            -javapkg=io.nekohasekai \
+            -libname=box \
+            -tags=with_gvisor,with_quic,with_wireguard,with_ech,with_utls,with_acme,with_clash_api \
+            -trimpath \
+            -ldflags="-X github.com/sagernet/sing-box/constant.Commit=unknown -X github.com/sagernet/sing-box/constant.Version=1.13.4 -buildid= -s -w" \
+            -o libbox.aar \
+            ./experimental/libbox
+
+      - name: Upload AAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libbox-aar-v1.13.4
+          path: libbox.aar
