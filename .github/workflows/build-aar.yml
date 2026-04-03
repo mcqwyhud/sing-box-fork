@@ -1,4 +1,4 @@
-name: Build AAR for v1.13.4
+name: Build AAR Only
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code (v1.13.4 tag)
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           ref: v1.13.4
@@ -41,12 +41,11 @@ jobs:
       - name: Build AAR
         run: |
           export PATH="$PATH:$(go env GOPATH)/bin"
-          # 不再手动设置 ANDROID_HOME 和 ANDROID_NDK_HOME
           ~/go/bin/gomobile bind -target=android/arm64,android/arm,android/386,android/amd64 \
             -androidapi=21 \
             -javapkg=io.nekohasekai \
             -libname=box \
-            -tags=with_gvisor,with_quic,with_wireguard,with_ech,with_utls,with_acme,with_clash_api \
+            -tags=with_gvisor,with_quic,with_wireguard,with_utls,with_acme,with_clash_api \
             -trimpath \
             -ldflags="-X github.com/sagernet/sing-box/constant.Commit=unknown -X github.com/sagernet/sing-box/constant.Version=1.13.4 -buildid= -s -w" \
             -o libbox.aar \
