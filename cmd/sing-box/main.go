@@ -7,12 +7,12 @@ import (
 	"context"
 	"os"
 	"sync"
+	"syscall"
 
-	"github.com/sagernet/sing-box/daemon"
 	"github.com/sagernet/sing-box/log"
 )
 
-// 保留原生入口通过编译
+// 原版的 main 入口
 func main() {
 	if err := mainCommand.Execute(); err != nil {
 		log.Fatal(err)
@@ -20,7 +20,7 @@ func main() {
 }
 
 // ============================================================================
-// Unity DLL 全局状态管理
+// Unity DLL 导出的全局状态与上下文管理
 // ============================================================================
 var (
 	ctxCancel context.CancelFunc
@@ -28,32 +28,47 @@ var (
 	isRunning bool
 )
 
-func startInternal(configPath string) int {
-	// 1. 拦截所有管道输出，阻止向没有控制台的 Unity 输出日志流导致闪退
+// 针对 Windows 平台的硬重定向：修复没有标准控制台管道导致写日志 SIGPIPE 闪退的问题
+func silenceSystemOutputs() {
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	setStdHandle := kernel32.NewProc("SetStdHandle")
+	
+	// 打开一个空设备
 	nullFile, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0666)
 	if err == nil {
+		handle := nullFile.Fd()
+		// STD_OUTPUT_HANDLE = -11, STD_ERROR_HANDLE = -12
+		_, _, _ = setStdHandle.Call(uintptr(1<<32-11), handle)
+		_, _, _ = setStdHandle.Call(uintptr(1<<32-12), handle)
 		os.Stdout = nullFile
 		os.Stderr = nullFile
 	}
+}
+
+func startInternal(configPath string) int {
+	// 🔥 核心防闪退机制 A：拦截 Windows 系统底层所有的标准控制台输出句柄
+	silenceSystemOutputs()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ctxCancel = cancel
 
-	// 2. 使用当前分支真正的本地底层服务核心 daemon.New 
-	instance, err := daemon.New(daemon.Options{
-		Context:    ctx,
-		ConfigPath: configPath,
-	})
-	if err != nil {
-		cancel()
-		return -1 // 配置路径不对或 JSON 格式错误，安全返回 -1，绝不闪退
-	}
-
-	// 3. 在独立协程中平滑拉起服务，防止阻塞 Unity 主线程
+	// 模拟官方原版 CLI 传参行为
+	osArgs := []string{"sing-box", "run", "-c", configPath}
+	
+	// 🔥 核心防闪退机制 B：隔离线程并用最高级别的全局异常收容所
 	go func() {
-		defer func() { _ = recover() }()
-		if err := instance.Start(); err != nil {
-			// 启动失败安全消化
+		defer func() {
+			if r := recover(); r != nil {
+				// 强行吃掉一切 Go 侧的 Panic 崩溃，确保不波及宿主 Unity
+			}
+		}()
+		
+		mainCommand.SetArgs(osArgs[1:])
+		
+		// 使用带 Context 的原生引擎启动，如果遇到配置文件不存在、端口被抢占等
+		// 如果它内部试图调用 os.Exit(1) 退出，由于没有直接暴露给系统，我们会尽可能用 Context 控制
+		if err := mainCommand.ExecuteContext(ctx); err != nil {
+			// 静默消化
 		}
 	}()
 
@@ -63,14 +78,14 @@ func startInternal(configPath string) int {
 
 func stopInternal() {
 	if ctxCancel != nil {
-		ctxCancel() // 撤销上下文，daemon 内部会自动关闭所有的 Socket、Inbound 和 Outbound 链路
+		ctxCancel() // 触发 Context 撤销，平滑收回底层绑定的 Socket 监听
 		ctxCancel = nil
 	}
 	isRunning = false
 }
 
 // ============================================================================
-// CGO 导出函数 (Unity 调用的 C 接口)
+// CGO 导出函数 (供 Unity P/Invoke 直接调用的 C 风格标准接口)
 // ============================================================================
 
 //export StartSingBox
