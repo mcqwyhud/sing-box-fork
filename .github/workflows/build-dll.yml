@@ -16,7 +16,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24.7' # 完美匹配你项目的 Go 版本
+        go-version: '1.24.7'
         cache: true
 
     - name: Install MinGW GCC (Fixed)
@@ -37,9 +37,8 @@ jobs:
         CGO_ENABLED: 1
       run: |
         mkdir -p build
-        # 切换到 cmd/sing-box 目录下，直接编译 main_dll.go，避免找不到本地依赖
-        cd cmd/sing-box
-        go build -buildmode=c-shared -ldflags="-s -w" -o ../../build/sing-box.dll main_dll.go
+        # 编译整个包含魔改后 main.go 的核心包
+        go build -buildmode=c-shared -ldflags="-s -w" -o build/sing-box.dll ./cmd/sing-box
       shell: bash
 
     - name: Upload Artifact
