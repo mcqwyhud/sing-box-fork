@@ -4,7 +4,7 @@ import "C"
 import (
 	"context"
 	"sync"
-	"github.com/sagernet/sing-box/box"
+	"./box" 
 )
 
 var (
