@@ -1,0 +1,46 @@
+name: Build Windows 64-bit DLL
+
+on:
+  push:
+    branches: [ "main", "master" ] # 当你向 main 或 master 分支推送代码时触发
+  workflow_dispatch: # 允许你在 GitHub 网页上收到手动点击触发构建
+
+jobs:
+  build-windows-dll:
+    runs-on: windows-latest # 在微软官方提供的 Windows 虚拟服务器上构建
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22' # 推荐使用稳定版 Go
+
+    - name: Install MinGW (GCC Compiler)
+      uses: egor-tensin/setup-mingw@v2
+      with:
+        platform: x64 # 明确指定安装 64 位 GCC
+
+    - name: Verify Environment
+      run: |
+        go version
+        gcc --version
+
+    - name: Build AMD64 DLL
+      env:
+        GOOS: windows
+        GOARCH: amd64
+        CGO_ENABLED: 1 # 编译 DLL 必须开启 CGO
+      run: |
+        # 编译命令：指定模式为 c-shared，输出名为 sing-box.dll，源文件为你刚写的 main_dll.go
+        go build -buildmode=c-shared -ldflags="-s -w" -o build/sing-box.dll main_dll.go
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sing-box-windows-x64-dll
+        path: |
+          build/sing-box.dll
+          build/sing-box.h
