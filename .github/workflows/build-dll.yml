@@ -37,9 +37,7 @@ jobs:
         CGO_ENABLED: 1
       run: |
         mkdir -p build
-        # 🔥 核心：因为你加了 replace，这一步会强制刷新并让 go.mod 认可主目录下的本地代码引用
-        go mod tidy       
-        # 编译 c-shared 动态链接库
+        # 🔥 不再运行 go mod tidy，直接强行本地编译入口文件
         go build -buildmode=c-shared -ldflags="-s -w" -o build/sing-box.dll main_dll.go
       shell: bash
 
