@@ -37,8 +37,8 @@ jobs:
         CGO_ENABLED: 1
       run: |
         mkdir -p build
-        # 🔥 不再运行 go mod tidy，直接强行本地编译入口文件
-        go build -buildmode=c-shared -ldflags="-s -w" -o build/sing-box.dll main_dll.go
+        # 🔥 编译路径精准定位到 cmd/sing-box，排除 main.go 防止多 main 冲突，直接编译本地逻辑
+        go build -buildmode=c-shared -ldflags="-s -w" -o build/sing-box.dll ./cmd/sing-box/main_dll.go
       shell: bash
 
     - name: Upload Artifact
