@@ -1,8 +1,9 @@
-package main // 🔥 保持和 cmd/sing-box/main.go 一致的包名
+package main
 
 import "C"
 import (
 	"context"
+	"os"
 	"sync"
 
 	"github.com/sagernet/sing-box/box"
@@ -18,6 +19,7 @@ func startInternal(configPath string) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctxCancel = cancel
 
+	// 直接调用当前分支最标准的 box 初始化
 	b, err := box.New(box.Options{
 		Context:    ctx,
 		ConfigPath: configPath,
