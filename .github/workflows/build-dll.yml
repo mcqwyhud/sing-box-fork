@@ -2,8 +2,8 @@ name: Build Windows 64-bit DLL
 
 on:
   push:
-    branches: [ "dev-1.13.4" ] # 精准匹配你当前的分支
-  workflow_dispatch: # 允许你在网页上点击按钮手动触发
+    branches: [ "dev-1.13.4" ]
+  workflow_dispatch:
 
 jobs:
   build-windows-dll:
@@ -17,12 +17,15 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.22'
-        cache: true # 开启缓存，加速后续编译
+        cache: true
 
-    - name: Install MinGW (GCC Compiler)
-      uses: egor-tensin/setup-mingw@v2
-      with:
-        platform: x64
+    # 💡 解决方案：放弃原来的 setup-mingw，改用 Windows 官方自带的 choco 默默安装 mingw 
+    # 并且加入 --no-progress 减少日志，末尾 || exit 0 防止它由于非致命清理错误阻断流程
+    - name: Install MinGW GCC (Fixed)
+      run: |
+        choco install mingw --no-progress -y
+        echo "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin" >> $GITHUB_PATH
+      shell: bash
 
     - name: Verify Environment
       run: |
@@ -35,10 +38,9 @@ jobs:
         GOARCH: amd64
         CGO_ENABLED: 1
       run: |
-        # 确保创建输出目录
-        mkdir build
-        # 编译 c-shared 动态链接库
+        mkdir -p build
         go build -buildmode=c-shared -ldflags="-s -w" -o build/sing-box.dll main_dll.go
+      shell: bash
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
