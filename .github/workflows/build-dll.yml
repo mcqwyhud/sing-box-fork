@@ -37,8 +37,6 @@ jobs:
         CGO_ENABLED: 1
       run: |
         mkdir -p build
-        go mod download    # 🔥 强行让云端先下载所有依赖
-        go mod tidy        # 🔥 强行梳理本地模块引用
         go build -buildmode=c-shared -ldflags="-s -w" -o build/sing-box.dll main_dll.go
       shell: bash
 
