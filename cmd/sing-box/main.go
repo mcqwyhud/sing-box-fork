@@ -2,22 +2,12 @@
 
 package main
 
-import "C" // 🔥 必须放在最顶部的 import 中
+import "C"
 import (
 	"context"
 	"sync"
 
-	"github.com/sagernet/sing-box/box"
 	"github.com/sagernet/sing-box/log"
-)
-
-// ============================================================================
-// Unity DLL 导出的全局变量
-// ============================================================================
-var (
-	instance  *box.Box
-	ctxCancel context.CancelFunc
-	mu        sync.Mutex
 )
 
 // ============================================================================
@@ -30,41 +20,44 @@ func main() {
 }
 
 // ============================================================================
-// Unity DLL 内部核心逻辑
+// Unity DLL 导出的全局状态与上下文管理
 // ============================================================================
+var (
+	ctxCancel context.CancelFunc
+	mu        sync.Mutex
+	isRunning bool
+)
+
 func startInternal(configPath string) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctxCancel = cancel
 
-	b, err := box.New(box.Options{
-		Context:    ctx,
-		ConfigPath: configPath,
-	})
-	if err != nil {
-		return -1
-	}
+	// 🔥 降维打击：直接模拟官方命令行传递参数的行为，调用原生的底层初始化
+	osArgs := []string{"sing-box", "run", "-c", configPath}
+	
+	// 创建一个独立线程去跑原本的 Execute()，防止阻塞 Unity 的主线程
+	go func() {
+		defer func() { recover() }()
+		mainCommand.SetArgs(osArgs[1:])
+		if err := mainCommand.ExecuteContext(ctx); err != nil {
+			log.Error(err)
+		}
+	}()
 
-	instance = b
-	err = instance.Start()
-	if err != nil {
-		return -2
-	}
+	isRunning = true
 	return 0
 }
 
 func stopInternal() {
-	if instance != nil {
-		instance.Close()
-		instance = nil
-	}
 	if ctxCancel != nil {
-		ctxCancel()
+		ctxCancel() // 触发 Context 取消，通知底层所有组件优雅退出
 		ctxCancel = nil
 	}
+	isRunning = false
 }
 
 // ============================================================================
-// CGO 导出函数 (Unity 调用的接口)
+// CGO 导出函数 (Unity 直接调用的接口)
 // ============================================================================
 
 //export StartSingBox
@@ -73,7 +66,7 @@ func StartSingBox(configPath *C.char) int {
 	defer mu.Unlock()
 	defer func() { recover() }()
 
-	if instance != nil {
+	if isRunning {
 		return 1
 	}
 	return startInternal(C.GoString(configPath))
@@ -86,6 +79,7 @@ func ReloadSingBox(newConfigPath *C.char) int {
 	defer func() { recover() }()
 
 	stopInternal()
+	// 稍微等待原实例释放网络端口
 	return startInternal(C.GoString(newConfigPath))
 }
 
