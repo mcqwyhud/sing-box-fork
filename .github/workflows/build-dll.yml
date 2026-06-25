@@ -16,7 +16,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24.7' # 🔥 关键修改：完美匹配你 go.mod 中的 Go 1.24.7 版本
+        go-version: '1.24.7'
         cache: true
 
     - name: Install MinGW GCC (Fixed)
@@ -37,6 +37,9 @@ jobs:
         CGO_ENABLED: 1
       run: |
         mkdir -p build
+        # 🔥 核心：因为你加了 replace，这一步会强制刷新并让 go.mod 认可主目录下的本地代码引用
+        go mod tidy       
+        # 编译 c-shared 动态链接库
         go build -buildmode=c-shared -ldflags="-s -w" -o build/sing-box.dll main_dll.go
       shell: bash
 
