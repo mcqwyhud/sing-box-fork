@@ -2,8 +2,27 @@
 
 package main
 
-import "github.com/sagernet/sing-box/log"
+import "C" // 🔥 必须放在最顶部的 import 中
+import (
+	"context"
+	"sync"
 
+	"github.com/sagernet/sing-box/box"
+	"github.com/sagernet/sing-box/log"
+)
+
+// ============================================================================
+// Unity DLL 导出的全局变量
+// ============================================================================
+var (
+	instance  *box.Box
+	ctxCancel context.CancelFunc
+	mu        sync.Mutex
+)
+
+// ============================================================================
+// 官方原版的 main 入口
+// ============================================================================
 func main() {
 	if err := mainCommand.Execute(); err != nil {
 		log.Fatal(err)
@@ -11,23 +30,8 @@ func main() {
 }
 
 // ============================================================================
-// 以下为 Unity DLL 导出逻辑，直接追加在 main.go 最底部
+// Unity DLL 内部核心逻辑
 // ============================================================================
-
-import "C"
-import (
-	"context"
-	"sync"
-
-	"github.com/sagernet/sing-box/box"
-)
-
-var (
-	instance  *box.Box
-	ctxCancel context.CancelFunc
-	mu        sync.Mutex
-)
-
 func startInternal(configPath string) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctxCancel = cancel
@@ -58,6 +62,10 @@ func stopInternal() {
 		ctxCancel = nil
 	}
 }
+
+// ============================================================================
+// CGO 导出函数 (Unity 调用的接口)
+// ============================================================================
 
 //export StartSingBox
 func StartSingBox(configPath *C.char) int {
